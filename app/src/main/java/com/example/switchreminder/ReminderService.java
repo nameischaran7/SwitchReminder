@@ -7,6 +7,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
 import android.net.wifi.WifiInfo;
@@ -25,14 +26,8 @@ public class ReminderService extends Service {
     private static final int NOTIFICATION_ID = 501;
 
     // CONFIGURATION AREA
-    private static final String TARGET_BSSID = "02:00:00:00:00:00";
-
-    // Your precise 2-meter sweet spot baseline
-    private static final int BASE_RSSI = -35;
-
-    // Dual thresholds to create your +5 / -5 buffer zone
-    private static final int ENTRY_THRESHOLD = BASE_RSSI+5;          // -30 dBm (Must get this close to trigger)
-    private static final int EXIT_THRESHOLD = BASE_RSSI - 5;       // -40 dBm (Signal must drop below this to reset)
+    private static final String TARGET_BSSID = "44:95:3b:ce:1d:70" +
+            "";
 
     private Handler proximityHandler;
     private Runnable proximityCheckRunnable;
@@ -72,46 +67,43 @@ public class ReminderService extends Service {
                             String currentBSSID = wifiInfo.getBSSID();
                             int currentRssi = wifiInfo.getRssi();
 
-                            // Live calibration tracking toast
-//                            //Toast.makeText(getApplicationContext(),
-//                                    "📡 Live Wi-Fi Strength: " + currentRssi + " dBm",
-//                                    Toast.LENGTH_SHORT).show();
-                            //Toast.makeText(getApplicationContext(),"BSSID"+currentBSSID,Toast.LENGTH_SHORT).show();
+                            // Verify connection to target or generic masked framework BSSID
+                            if (currentBSSID != null && (currentBSSID.equalsIgnoreCase(TARGET_BSSID) || currentBSSID.equals("02:00:00:00:00:00"))) {
 
-                            if (currentBSSID != null && currentBSSID.equalsIgnoreCase(TARGET_BSSID)) {
+                                // DYNAMIC RETRIEVAL: Pull parameters directly saved by the user interface settings
+                                SharedPreferences sharedPref = getSharedPreferences("SwitchReminderPrefs", Context.MODE_PRIVATE);
+                                int dynamicMax = sharedPref.getInt("MAX_DBM", -25);
+                                int dynamicMin = sharedPref.getInt("MIN_DBM", -36);
 
-                                // Check if the signal is perfectly sitting in your switchboard pocket
-                                if (currentRssi <= -30 && currentRssi >= -40) {
+                                // Apply the user-configured custom evaluation box mapping
+                                if (currentRssi <= dynamicMax && currentRssi >= dynamicMin) {
 
                                     if (!isInsideTargetRadius) {
-                                        // FIRST TIME ENTERING THE WINDOW: Lock the gate!
                                         isInsideTargetRadius = true;
-                                        //Toast.makeText(getApplicationContext(), "📍 Switchboard Pocket Locked! Verifying power in 1 min...", Toast.LENGTH_LONG).show();
-
-                                        // Start the 1-minute validation check buffer
+                                        Toast.makeText(getApplicationContext(), "📍 Custom Desk Pocket Locked! Checking power in 1 min...", Toast.LENGTH_LONG).show();
                                         new Handler(Looper.getMainLooper()).postDelayed(() -> verifyChargingStatus(), 60000);
                                     }
 
                                 } else {
-                                    // EXIT CONDITION: Signal went outside the pocket (e.g. -29 or -41)
                                     if (isInsideTargetRadius) {
                                         isInsideTargetRadius = false;
-                                       // Toast.makeText(getApplicationContext(), "🚶 Left the switchboard pocket.", Toast.LENGTH_SHORT).show();
+                                        Toast.makeText(getApplicationContext(), "🚶 Left the custom desk pocket radius.", Toast.LENGTH_SHORT).show();
                                     }
                                 }
                             }
                         }
                     }
                 }
-                // Check the pocket window every 3 seconds
+                // Check the pocket window configuration every 3 seconds
                 proximityHandler.postDelayed(this, 3000);
             }
         };
 
         proximityHandler.post(proximityCheckRunnable);
     }
+
     private void verifyChargingStatus() {
-        // If you walked away during that 1-minute buffer window, cancel the check silently
+        // If the user walked away during that 1-minute buffer window, cancel the check silently
         if (!isInsideTargetRadius) return;
 
         IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
