@@ -4,7 +4,6 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#F8F9FA"
-    android:gravity="center"
     android:padding="24dp">
 
     <LinearLayout
@@ -12,36 +11,77 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:background="@android:drawable/dialog_holo_light_frame"
-        android:padding="24dp"
+        android:padding="20dp"
+        android:layout_marginBottom="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Configure Signal Pocket"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:textColor="#212121"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Maximum Strength Limit (e.g., -25)"
+            android:textColor="#666666"
+            android:textSize="12sp" />
+        <EditText
+            android:id="@+id/inputMaxDbm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberSigned"
+            android:hint="-25"
+            android:layout_marginBottom="12dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Minimum Strength Limit (e.g., -36)"
+            android:textColor="#666666"
+            android:textSize="12sp" />
+        <EditText
+            android:id="@+id/inputMinDbm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberSigned"
+            android:hint="-36"
+            android:layout_marginBottom="16dp"/>
+
+        <Button
+            android:id="@+id/btnSaveConfig"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Save &amp; Update Monitor"
+            android:backgroundTint="#4CAF50"
+            android:textColor="#FFFFFF"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@android:drawable/dialog_holo_light_frame"
+        android:padding="20dp"
         android:gravity="center">
 
         <ImageView
-            android:id="@+id/statusIcon"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:src="@android:drawable/button_onoff_indicator_on"
-            android:contentDescription="Status Active" />
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:src="@android:drawable/button_onoff_indicator_on" />
 
         <TextView
             android:id="@+id/statusTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             android:text="Monitor is Active"
             android:textColor="#212121"
-            android:textSize="22sp"
+            android:textSize="18sp"
             android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/statusDescription"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="The app will automatically detect if your charging cable is plugged into a switch that is turned off."
-            android:textColor="#666666"
-            android:textSize="14sp"
-            android:gravity="center" />
-
     </LinearLayout>
 
     <View
@@ -50,12 +90,10 @@
         android:layout_weight="1" />
 
     <TextView
-        android:id="@+id/footerText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Running as a Foreground Service"
+        android:text="Running as a Persistent Service"
         android:textColor="#999999"
         android:textSize="12sp"
-        android:layout_marginBottom="8dp" />
-
+        android:layout_gravity="center" />
 </LinearLayout>

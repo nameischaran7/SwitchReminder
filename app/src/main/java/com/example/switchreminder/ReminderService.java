@@ -4,128 +4,174 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
 
 public class ReminderService extends Service {
 
-    private static final String PERSISTENT_CHANNEL_ID = "reminder_service_channel";
-    private static final String ALERT_CHANNEL_ID = "power_alert_channel";
-    private static final int PERSISTENT_NOTIFICATION_ID = 1;
-    private static final int ALERT_NOTIFICATION_ID = 2;
+    private static final String CHANNEL_ID = "precise_power_alerts";
+    private static final int NOTIFICATION_ID = 501;
 
-    private BroadcastReceiver cableReceiver;
+    // CONFIGURATION AREA
+    private static final String TARGET_BSSID = "02:00:00:00:00:00";
+
+    // Your precise 2-meter sweet spot baseline
+    private static final int BASE_RSSI = -35;
+
+    // Dual thresholds to create your +5 / -5 buffer zone
+    private static final int ENTRY_THRESHOLD = BASE_RSSI+5;          // -30 dBm (Must get this close to trigger)
+    private static final int EXIT_THRESHOLD = BASE_RSSI - 5;       // -40 dBm (Signal must drop below this to reset)
+
+    private Handler proximityHandler;
+    private Runnable proximityCheckRunnable;
+    private boolean isInsideTargetRadius = false;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        createNotificationChannels();
+        createNotificationChannel();
 
-        // Start as Foreground Service with a persistent notification
-        Notification persistentNotification = new NotificationCompat.Builder(this, PERSISTENT_CHANNEL_ID)
-                .setContentTitle("Switch Reminder Active")
-                .setContentText("Monitoring charging port connections...")
-                .setSmallIcon(android.R.drawable.ic_menu_info_details)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("Proximity Monitor Active")
+                .setContentText("Scanning for charging station proximity...")
+                .setSmallIcon(android.R.drawable.ic_menu_compass)
                 .setOngoing(true)
                 .build();
+        startForeground(NOTIFICATION_ID, notification);
 
-        startForeground(PERSISTENT_NOTIFICATION_ID, persistentNotification);
+        startProximityTracking();
+    }
 
-        // Set up the receiver to listen for physical cable plug-ins
+    private void startProximityTracking() {
+        proximityHandler = new Handler(Looper.getMainLooper());
+        ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
 
-                cableReceiver = new BroadcastReceiver() {
+        proximityCheckRunnable = new Runnable() {
             @Override
-            public void onReceive(Context context, Intent intent) {
-                if (Intent.ACTION_POWER_CONNECTED.equals(intent.getAction())) {
-                    // DEBUG TOAST: Tells us if the hardware trigger fired
-                    android.widget.Toast.makeText(context, "🔌 Hardware detected cable plug-in!", android.widget.Toast.LENGTH_SHORT).show();
+            public void run() {
+                if (connectivityManager != null) {
+                    android.net.Network activeNetwork = connectivityManager.getActiveNetwork();
+                    NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(activeNetwork);
 
-                    // Wait 5 seconds for hardware state to settle
-                    new Handler(Looper.getMainLooper()).postDelayed(() -> checkPowerStatus(context), 5000);
+                    if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                        if (wifiManager != null) {
+                            WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+                            String currentBSSID = wifiInfo.getBSSID();
+                            int currentRssi = wifiInfo.getRssi();
+
+                            // Live calibration tracking toast
+//                            //Toast.makeText(getApplicationContext(),
+//                                    "📡 Live Wi-Fi Strength: " + currentRssi + " dBm",
+//                                    Toast.LENGTH_SHORT).show();
+                            //Toast.makeText(getApplicationContext(),"BSSID"+currentBSSID,Toast.LENGTH_SHORT).show();
+
+                            if (currentBSSID != null && currentBSSID.equalsIgnoreCase(TARGET_BSSID)) {
+
+                                // Check if the signal is perfectly sitting in your switchboard pocket
+                                if (currentRssi <= -30 && currentRssi >= -40) {
+
+                                    if (!isInsideTargetRadius) {
+                                        // FIRST TIME ENTERING THE WINDOW: Lock the gate!
+                                        isInsideTargetRadius = true;
+                                        //Toast.makeText(getApplicationContext(), "📍 Switchboard Pocket Locked! Verifying power in 1 min...", Toast.LENGTH_LONG).show();
+
+                                        // Start the 1-minute validation check buffer
+                                        new Handler(Looper.getMainLooper()).postDelayed(() -> verifyChargingStatus(), 60000);
+                                    }
+
+                                } else {
+                                    // EXIT CONDITION: Signal went outside the pocket (e.g. -29 or -41)
+                                    if (isInsideTargetRadius) {
+                                        isInsideTargetRadius = false;
+                                       // Toast.makeText(getApplicationContext(), "🚶 Left the switchboard pocket.", Toast.LENGTH_SHORT).show();
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
+                // Check the pocket window every 3 seconds
+                proximityHandler.postDelayed(this, 3000);
             }
         };
 
-        IntentFilter filter = new IntentFilter(Intent.ACTION_POWER_CONNECTED);
-        registerReceiver(cableReceiver, filter);
+        proximityHandler.post(proximityCheckRunnable);
     }
+    private void verifyChargingStatus() {
+        // If you walked away during that 1-minute buffer window, cancel the check silently
+        if (!isInsideTargetRadius) return;
 
-    private void checkPowerStatus(Context context) {
         IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-        Intent batteryStatus = context.registerReceiver(null, ifilter);
+        Intent batteryStatus;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            batteryStatus = registerReceiver(null, ifilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            batteryStatus = registerReceiver(null, ifilter);
+        }
 
         if (batteryStatus != null) {
             int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
             boolean isCharging = (status == BatteryManager.BATTERY_STATUS_CHARGING ||
                     status == BatteryManager.BATTERY_STATUS_FULL);
 
-            // DEBUG TOAST: Tells us what the phone thinks the charging state is
-            android.widget.Toast.makeText(context, "Is Charging? " + isCharging, android.widget.Toast.LENGTH_SHORT).show();
-
             if (!isCharging) {
-                sendAlertNotification(context);
+                sendAlert();
             }
-        } else {
-            android.widget.Toast.makeText(context, "Battery status intent was NULL", android.widget.Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void sendAlertNotification(Context context) {
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, ALERT_CHANNEL_ID)
+    private void sendAlert() {
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
-                .setContentTitle("⚠️ Switch is OFF!")
-                .setContentText("Cable detected, but no power is flowing. Turn on the switch!")
+                .setContentTitle("⚠️ Switch is Turned OFF!")
+                .setContentText("Phone is at the switchboard, but not eating charge. Turn on the switch!")
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true);
 
-        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager != null) {
-            manager.notify(ALERT_NOTIFICATION_ID, builder.build());
+            manager.notify(502, builder.build());
         }
     }
 
-    private void createNotificationChannels() {
+    private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID, "Proximity Charger Alert", NotificationManager.IMPORTANCE_HIGH);
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) {
-                // Channel for the persistent service notification
-                NotificationChannel serviceChannel = new NotificationChannel(
-                        PERSISTENT_CHANNEL_ID, "Service Status", NotificationManager.IMPORTANCE_LOW);
-                manager.createNotificationChannel(serviceChannel);
-
-                // Channel for the actual high-priority alert
-                NotificationChannel alertChannel = new NotificationChannel(
-                        ALERT_CHANNEL_ID, "Power Alerts", NotificationManager.IMPORTANCE_HIGH);
-                manager.createNotificationChannel(alertChannel);
+                manager.createNotificationChannel(channel);
             }
         }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // START_STICKY ensures the OS attempts to recreate the service if it gets killed due to low memory
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (cableReceiver != null) {
-            unregisterReceiver(cableReceiver);
+        if (proximityHandler != null) {
+            proximityHandler.removeCallbacks(proximityCheckRunnable);
         }
     }
 
     @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
+    public IBinder onBind(Intent intent) { return null; }
 }
