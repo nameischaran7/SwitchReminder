@@ -17,16 +17,59 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Configure Signal Pocket"
+            android:text="Configure Proximity Spot"
             android:textStyle="bold"
             android:textSize="18sp"
             android:textColor="#212121"
-            android:layout_marginBottom="16dp"/>
+            android:layout_marginBottom="12dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="#E8F5E9"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="📍 Stand at your board. Your current live strength is:"
+                android:textColor="#2E7D32"
+                android:textSize="13sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/txtLiveDbmMonitor"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="-- dBm"
+                android:textColor="#1B5E20"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginLeft="8dp"/>
+        </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Maximum Strength Limit (e.g., -25)"
+            android:text="Target Wi-Fi Name (SSID)"
+            android:textColor="#666666"
+            android:textSize="12sp" />
+        <EditText
+            android:id="@+id/inputWifiName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text"
+            android:hint="e.g., RH-2.4G-CE1D70"
+            android:layout_marginBottom="12dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Maximum Strength Limit (Stronger Signal)"
             android:textColor="#666666"
             android:textSize="12sp" />
         <EditText
@@ -40,7 +83,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Minimum Strength Limit (e.g., -36)"
+            android:text="Minimum Strength Limit (Weaker Signal)"
             android:textColor="#666666"
             android:textSize="12sp" />
         <EditText
@@ -78,22 +121,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Monitor is Active"
+            android:text="Monitor Active"
             android:textColor="#212121"
             android:textSize="18sp"
             android:textStyle="bold" />
     </LinearLayout>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Running as a Persistent Service"
-        android:textColor="#999999"
-        android:textSize="12sp"
-        android:layout_gravity="center" />
 </LinearLayout>

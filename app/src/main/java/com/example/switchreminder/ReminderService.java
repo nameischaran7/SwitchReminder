@@ -64,37 +64,44 @@ public class ReminderService extends Service {
                         WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
                         if (wifiManager != null) {
                             WifiInfo wifiInfo = wifiManager.getConnectionInfo();
-                            String currentBSSID = wifiInfo.getBSSID();
+
+                            String currentSSID = wifiInfo.getBSSID();
+                            currentSSID = wifiInfo.getSSID();
                             int currentRssi = wifiInfo.getRssi();
 
-                            // Verify connection to target or generic masked framework BSSID
-                            if (currentBSSID != null && (currentBSSID.equalsIgnoreCase(TARGET_BSSID) || currentBSSID.equals("02:00:00:00:00:00"))) {
 
-                                // DYNAMIC RETRIEVAL: Pull parameters directly saved by the user interface settings
-                                SharedPreferences sharedPref = getSharedPreferences("SwitchReminderPrefs", Context.MODE_PRIVATE);
-                                int dynamicMax = sharedPref.getInt("MAX_DBM", -25);
-                                int dynamicMin = sharedPref.getInt("MIN_DBM", -36);
+                            if (currentSSID != null) {
+                                currentSSID = currentSSID.replace("\"", "");
+                            }
+                            // DYNAMIC RETRIEVAL
+                            SharedPreferences sharedPref = getSharedPreferences("SwitchReminderPrefs", Context.MODE_PRIVATE);
+                            String userTargetSSID = sharedPref.getString("TARGET_SSID", "RH-2.4G-CE1D70");
+                            int dynamicMax = sharedPref.getInt("MAX_DBM", -25);
+                            int dynamicMin = sharedPref.getInt("MIN_DBM", -36);
 
-                                // Apply the user-configured custom evaluation box mapping
+
+                            if (currentSSID != null && currentSSID.equalsIgnoreCase(userTargetSSID)) {
+
+                                // Match against the user's custom pocket parameters
                                 if (currentRssi <= dynamicMax && currentRssi >= dynamicMin) {
 
                                     if (!isInsideTargetRadius) {
                                         isInsideTargetRadius = true;
-                                        Toast.makeText(getApplicationContext(), "📍 Custom Desk Pocket Locked! Checking power in 1 min...", Toast.LENGTH_LONG).show();
+                                        Toast.makeText(getApplicationContext(), "📍 Target SSID Pocket Locked! Verifying power in 1 min...", Toast.LENGTH_LONG).show();
                                         new Handler(Looper.getMainLooper()).postDelayed(() -> verifyChargingStatus(), 60000);
                                     }
 
                                 } else {
                                     if (isInsideTargetRadius) {
                                         isInsideTargetRadius = false;
-                                        Toast.makeText(getApplicationContext(), "🚶 Left the custom desk pocket radius.", Toast.LENGTH_SHORT).show();
+                                        Toast.makeText(getApplicationContext(), "🚶 Left the custom pocket radius.", Toast.LENGTH_SHORT).show();
                                     }
                                 }
                             }
                         }
                     }
                 }
-                // Check the pocket window configuration every 3 seconds
+                // Check verification loop every 3 seconds
                 proximityHandler.postDelayed(this, 3000);
             }
         };
